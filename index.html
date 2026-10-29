@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wine PCA Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, "Segoe UI", sans-serif;
+      background: #0b1120;
+      color: #e5eaf5;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --muted: #91a0b8;
+      --border: #263248;
+      --panel: #111a2c;
+      --accent: #6ea8fe;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(ellipse at 15% 0%, #172b4d 0, transparent 38rem),
+        #0b1120;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 48px 0 64px;
+    }
+
+    .eyebrow {
+      color: #8db9ff;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 10px 0 8px;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      letter-spacing: -0.045em;
+    }
+
+    .intro, .help { color: var(--muted); line-height: 1.65; }
+    .intro { max-width: 680px; margin: 0; }
+
+    .panel {
+      margin-top: 26px;
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      box-shadow: 0 18px 50px #00000024;
+    }
+
+    .upload-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .upload {
+      display: grid;
+      gap: 9px;
+      color: #dce5f5;
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    input[type="file"], select {
+      width: 100%;
+      min-height: 44px;
+      padding: 9px 11px;
+      border: 1px solid #34445f;
+      border-radius: 9px;
+      background: #0b1322;
+      color: #dce5f5;
+      font: inherit;
+    }
+
+    input[type="file"]::file-selector-button {
+      margin-right: 10px;
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: #243653;
+      color: #e5eaf5;
+      cursor: pointer;
+    }
+
+    .help { margin: 14px 0 0; font-size: 0.88rem; }
+
+    #status {
+      min-height: 24px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    #status[data-error="true"] { color: #ff9a9a; }
+    #dashboard[hidden] { display: none; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 22px 0;
+    }
+
+    .stat {
+      padding: 17px 19px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    .stat-label { color: var(--muted); font-size: 0.82rem; }
+    .stat-value { display: block; margin-top: 7px; font-size: 1.5rem; font-weight: 700; }
+
+    .charts {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 18px;
+    }
+
+    .chart-panel {
+      min-width: 0;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    .chart-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    h2 { margin: 0; font-size: 1.08rem; }
+    .chart-note { margin: 6px 0 0; color: var(--muted); font-size: 0.82rem; }
+    .axis-select { width: auto; min-width: 92px; }
+
+    svg { display: block; width: 100%; height: auto; overflow: visible; }
+    .grid-line { stroke: #2a3850; stroke-width: 1; }
+    .tick-label, .axis-label, .bar-label {
+      fill: #a7b5ca;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    .axis-label { fill: #dce5f5; font-size: 12px; }
+    .scatter-point { fill: #6ea8fe; fill-opacity: 0.68; }
+    .variance-bar { fill: #70d6b3; }
+    .cumulative-line { fill: none; stroke: #f5bb61; stroke-width: 2; }
+    .cumulative-point { fill: #f5bb61; }
+
+    @media (max-width: 760px) {
+      .charts { grid-template-columns: 1fr; }
+      .upload-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 480px) {
+      main { width: min(100% - 24px, 1120px); padding-top: 32px; }
+      .panel, .chart-panel { padding: 16px; }
+      .stats { gap: 8px; }
+      .stat { padding: 12px; }
+      .stat-value { font-size: 1.15rem; }
+      .chart-heading { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Principal Component Analysis</div>
+      <h1>Wine PCA Dashboard</h1>
+      <p class="intro">Explore the wine dataset's PCA scores and the variance captured by each of its nine components.</p>
+    </header>
+
+    <section class="panel" aria-labelledby="data-heading">
+      <h2 id="data-heading">Load PCA data</h2>
+      <div class="upload-grid" style="margin-top: 16px">
+        <label class="upload" for="scores-file">
+          PCA scores
+          <input id="scores-file" type="file" accept=".csv,text/csv">
+        </label>
+        <label class="upload" for="variance-file">
+          Explained variance
+          <input id="variance-file" type="file" accept=".csv,text/csv">
+        </label>
+      </div>
+      <p class="help">Run <code>PCA.py</code>, then select <code>wine_pca.csv</code> and <code>wine_pca_variance.csv</code>. This page works locally; no server or Matplotlib is needed.</p>
+      <p id="status" role="status" aria-live="polite">Select both CSV files to display the graphs.</p>
+    </section>
+
+    <section id="dashboard" hidden aria-label="PCA charts">
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Wine samples</span><strong class="stat-value" id="sample-count">—</strong></div>
+        <div class="stat"><span class="stat-label">Components</span><strong class="stat-value" id="component-count">—</strong></div>
+        <div class="stat"><span class="stat-label">Variance retained</span><strong class="stat-value" id="variance-total">—</strong></div>
+      </div>
+
+      <div class="charts">
+        <section class="chart-panel" aria-labelledby="scatter-heading">
+          <div class="chart-heading">
+            <div>
+              <h2 id="scatter-heading">PCA score scatter plot</h2>
+              <p class="chart-note">Each dot represents one wine sample.</p>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <label>
+                <span class="chart-note">X axis</span>
+                <select id="x-axis" class="axis-select" aria-label="X-axis component"></select>
+              </label>
+              <label>
+                <span class="chart-note">Y axis</span>
+                <select id="y-axis" class="axis-select" aria-label="Y-axis component"></select>
+              </label>
+            </div>
+          </div>
+          <svg id="scatter-chart" viewBox="0 0 760 470" role="img" aria-label="Scatter plot of PCA component scores"></svg>
+        </section>
+
+        <section class="chart-panel" aria-labelledby="variance-heading">
+          <div>
+            <h2 id="variance-heading">Explained variance</h2>
+            <p class="chart-note">Bars show each component; the line shows cumulative variance.</p>
+          </div>
+          <svg id="variance-chart" viewBox="0 0 600 470" role="img" aria-label="Explained and cumulative variance by component"></svg>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const scoresInput = document.getElementById("scores-file");
+    const varianceInput = document.getElementById("variance-file");
+    const statusElement = document.getElementById("status");
+    const dashboard = document.getElementById("dashboard");
+    const xAxis = document.getElementById("x-axis");
+    const yAxis = document.getElementById("y-axis");
+    let scores = [];
+    let components = [];
+    let variance = [];
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let quoted = false;
+
+      for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        if (quoted) {
+          if (character === '"' && text[index + 1] === '"') {
+            cell += '"';
+            index += 1;
+          } else if (character === '"') {
+            quoted = false;
+          } else {
+            cell += character;
+          }
+        } else if (character === '"') {
+          quoted = true;
+        } else if (character === ",") {
+          row.push(cell.trim());
+          cell = "";
+        } else if (character === "\n" || character === "\r") {
+          if (character === "\r" && text[index + 1] === "\n") index += 1;
+          row.push(cell.trim());
+          if (row.some(value => value !== "")) rows.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += character;
+        }
+      }
+
+      if (quoted) throw new Error("A CSV file has an unclosed quoted field.");
+      row.push(cell.trim());
+      if (row.some(value => value !== "")) rows.push(row);
+      if (rows.length < 2) throw new Error("A CSV file must contain a header and at least one data row.");
+
+      const headers = rows[0].map(value => value.replace(/^\uFEFF/, ""));
+      const records = rows.slice(1).map((values, rowIndex) => {
+        if (values.length !== headers.length) {
+          throw new Error(`CSV row ${rowIndex + 2} has ${values.length} values; expected ${headers.length}.`);
+        }
+        return Object.fromEntries(headers.map((header, index) => [header, values[index]]));
+      });
+      return { headers, records };
+    }
+
+    function readCsv(file) {
+      return file.text().then(parseCsv);
+    }
+
+    function setStatus(message, isError = false) {
+      statusElement.textContent = message;
+      statusElement.dataset.error = String(isError);
+    }
+
+    function numberFrom(record, key, rowNumber) {
+      const value = Number(record[key]);
+      if (record[key] === "" || !Number.isFinite(value)) {
+        throw new Error(`Invalid number in "${key}" at CSV data row ${rowNumber}.`);
+      }
+      return value;
+    }
+
+    function validateData(scoreCsv, varianceCsv) {
+      const pcColumns = scoreCsv.headers.filter(header => /^PC\d+$/.test(header));
+      if (pcColumns.length < 2 || pcColumns.length !== scoreCsv.headers.length) {
+        throw new Error("The score CSV must contain only PCA columns such as PC1 through PC9.");
+      }
+      pcColumns.forEach((column, index) => {
+        if (column !== `PC${index + 1}`) throw new Error("PCA columns must be ordered consecutively from PC1.");
+      });
+      if (pcColumns.length !== varianceCsv.records.length) {
+        throw new Error("The score and variance CSV files contain different numbers of components.");
+      }
+      for (const column of ["Component", "ExplainedVarianceRatio", "CumulativeExplainedVariance"]) {
+        if (!varianceCsv.headers.includes(column)) {
+          throw new Error(`The variance CSV is missing the "${column}" column.`);
+        }
+      }
+
+      const scoreRecords = scoreCsv.records.map((record, rowIndex) => {
+        const values = {};
+        for (const component of pcColumns) values[component] = numberFrom(record, component, rowIndex + 2);
+        return values;
+      });
+      const varianceRecords = varianceCsv.records.map((record, index) => {
+        const rowNumber = index + 2;
+        if (record.Component !== pcColumns[index]) {
+          throw new Error(`Variance CSV row ${rowNumber} should describe ${pcColumns[index]}.`);
+        }
+        const ratio = numberFrom(record, "ExplainedVarianceRatio", rowNumber);
+        const cumulative = numberFrom(record, "CumulativeExplainedVariance", rowNumber);
+        if (ratio < 0 || ratio > 1 || cumulative < 0 || cumulative > 1) {
+          throw new Error(`Variance values at CSV row ${rowNumber} must be between 0 and 1.`);
+        }
+        return { component: record.Component, ratio, cumulative };
+      });
+      return { pcColumns, scoreRecords, varianceRecords };
+    }
+
+    function svgElement(name, attributes = {}, text = "") {
+      const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+      if (text) element.textContent = text;
+      return element;
+    }
+
+    function drawScatter() {
+      const svg = document.getElementById("scatter-chart");
+      svg.replaceChildren();
+      const width = 760;
+      const height = 470;
+      const margin = { top: 18, right: 24, bottom: 58, left: 66 };
+      const plotWidth = width - margin.left - margin.right;
+      const plotHeight = height - margin.top - margin.bottom;
+      const xValues = scores.map(record => record[xAxis.value]);
+      const yValues = scores.map(record => record[yAxis.value]);
+      const xMin = Math.min(...xValues);
+      const xMax = Math.max(...xValues);
+      const yMin = Math.min(...yValues);
+      const yMax = Math.max(...yValues);
+      const xPadding = (xMax - xMin || 1) * 0.06;
+      const yPadding = (yMax - yMin || 1) * 0.06;
+      const xDomain = [xMin - xPadding, xMax + xPadding];
+      const yDomain = [yMin - yPadding, yMax + yPadding];
+      const x = value => margin.left + ((value - xDomain[0]) / (xDomain[1] - xDomain[0])) * plotWidth;
+      const y = value => margin.top + plotHeight - ((value - yDomain[0]) / (yDomain[1] - yDomain[0])) * plotHeight;
+      const tickCount = 5;
+
+      for (let index = 0; index <= tickCount; index += 1) {
+        const xValue = xDomain[0] + ((xDomain[1] - xDomain[0]) * index) / tickCount;
+        const yValue = yDomain[0] + ((yDomain[1] - yDomain[0]) * index) / tickCount;
+        const xPosition = x(xValue);
+        const yPosition = y(yValue);
+        svg.append(
+          svgElement("line", { x1: xPosition, y1: margin.top, x2: xPosition, y2: margin.top + plotHeight, class: "grid-line" }),
+          svgElement("line", { x1: margin.left, y1: yPosition, x2: margin.left + plotWidth, y2: yPosition, class: "grid-line" }),
+          svgElement("text", { x: xPosition, y: margin.top + plotHeight + 20, "text-anchor": "middle", class: "tick-label" }, xValue.toFixed(1)),
+          svgElement("text", { x: margin.left - 10, y: yPosition + 4, "text-anchor": "end", class: "tick-label" }, yValue.toFixed(1))
+        );
+      }
+
+      scores.forEach((record, index) => {
+        const point = svgElement("circle", {
+          cx: x(record[xAxis.value]),
+          cy: y(record[yAxis.value]),
+          r: scores.length > 700 ? 2 : 3,
+          class: "scatter-point"
+        });
+        point.appendChild(svgElement("title", {}, `Sample ${index + 1}: ${xAxis.value} ${record[xAxis.value].toFixed(3)}, ${yAxis.value} ${record[yAxis.value].toFixed(3)}`));
+        svg.appendChild(point);
+      });
+
+      svg.append(
+        svgElement("text", { x: margin.left + plotWidth / 2, y: height - 12, "text-anchor": "middle", class: "axis-label" }, xAxis.value),
+        svgElement("text", { x: 17, y: margin.top + plotHeight / 2, transform: `rotate(-90 17 ${margin.top + plotHeight / 2})`, "text-anchor": "middle", class: "axis-label" }, yAxis.value)
+      );
+    }
+
+    function drawVariance() {
+      const svg = document.getElementById("variance-chart");
+      svg.replaceChildren();
+      const width = 600;
+      const height = 470;
+      const margin = { top: 25, right: 24, bottom: 58, left: 58 };
+      const plotWidth = width - margin.left - margin.right;
+      const plotHeight = height - margin.top - margin.bottom;
+      const slotWidth = plotWidth / variance.length;
+      const scaleTop = 1;
+      const y = value => margin.top + plotHeight - (value / scaleTop) * plotHeight;
+      const linePoints = [];
+
+      for (let index = 0; index <= 5; index += 1) {
+        const value = (scaleTop * index) / 5;
+        const yPosition = y(value);
+        svg.append(
+          svgElement("line", { x1: margin.left, y1: yPosition, x2: margin.left + plotWidth, y2: yPosition, class: "grid-line" }),
+          svgElement("text", { x: margin.left - 9, y: yPosition + 4, "text-anchor": "end", class: "tick-label" }, `${(value * 100).toFixed(0)}%`)
+        );
+      }
+
+      variance.forEach((item, index) => {
+        const center = margin.left + slotWidth * (index + 0.5);
+        const barWidth = Math.min(34, slotWidth * 0.56);
+        const bar = svgElement("rect", {
+          x: center - barWidth / 2,
+          y: y(item.ratio),
+          width: barWidth,
+          height: Math.max(0, y(0) - y(item.ratio)),
+          rx: 4,
+          class: "variance-bar"
+        });
+        bar.appendChild(svgElement("title", {}, `${item.component}: ${(item.ratio * 100).toFixed(2)}% explained`));
+        svg.append(
+          bar,
+          svgElement("text", { x: center, y: margin.top + plotHeight + 20, "text-anchor": "middle", class: "tick-label" }, item.component)
+        );
+        linePoints.push(`${center},${y(item.cumulative)}`);
+      });
+
+      svg.appendChild(svgElement("polyline", { points: linePoints.join(" "), class: "cumulative-line" }));
+      variance.forEach((item, index) => {
+        const center = margin.left + slotWidth * (index + 0.5);
+        const point = svgElement("circle", { cx: center, cy: y(item.cumulative), r: 4, class: "cumulative-point" });
+        point.appendChild(svgElement("title", {}, `${item.component}: ${(item.cumulative * 100).toFixed(2)}% cumulative`));
+        svg.appendChild(point);
+      });
+      svg.append(
+        svgElement("text", { x: margin.left + plotWidth / 2, y: height - 12, "text-anchor": "middle", class: "axis-label" }, "Principal component"),
+        svgElement("text", { x: 16, y: margin.top + plotHeight / 2, transform: `rotate(-90 16 ${margin.top + plotHeight / 2})`, "text-anchor": "middle", class: "axis-label" }, "Variance ratio")
+      );
+    }
+
+    function render() {
+      const scoreFile = scoresInput.files[0];
+      const varianceFile = varianceInput.files[0];
+      if (!scoreFile || !varianceFile) {
+        dashboard.hidden = true;
+        setStatus("Select both CSV files to display the graphs.");
+        return;
+      }
+
+      setStatus("Reading PCA data…");
+      Promise.all([readCsv(scoreFile), readCsv(varianceFile)])
+        .then(([scoreCsv, varianceCsv]) => {
+          const parsed = validateData(scoreCsv, varianceCsv);
+          components = parsed.pcColumns;
+          scores = parsed.scoreRecords;
+          variance = parsed.varianceRecords;
+          xAxis.replaceChildren(...components.map(component => new Option(component, component)));
+          yAxis.replaceChildren(...components.map(component => new Option(component, component)));
+          xAxis.value = components[0];
+          yAxis.value = components[1];
+          document.getElementById("sample-count").textContent = scores.length.toLocaleString();
+          document.getElementById("component-count").textContent = components.length;
+          document.getElementById("variance-total").textContent = `${(variance[variance.length - 1].cumulative * 100).toFixed(1)}%`;
+          drawScatter();
+          drawVariance();
+          dashboard.hidden = false;
+          setStatus(`Loaded ${scores.length.toLocaleString()} samples and ${components.length} components.`);
+        })
+        .catch(error => {
+          dashboard.hidden = true;
+          setStatus(error.message, true);
+        });
+    }
+
+    scoresInput.addEventListener("change", render);
+    varianceInput.addEventListener("change", render);
+    xAxis.addEventListener("change", drawScatter);
+    yAxis.addEventListener("change", drawScatter);
+  </script>
+</body>
+</html>
